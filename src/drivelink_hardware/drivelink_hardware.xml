@@ -1,0 +1,14 @@
+<library path="drivelink_hardware">
+  <class
+    name="drivelink_hardware/DriveLinkSystem"
+    type="drivelink_hardware::DriveLinkSystem"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>DriveLink system hardware interface</description>
+  </class>
+  <class
+    name="drivelink_hardware/DriveLinkImuSensor"
+    type="drivelink_hardware::DriveLinkImuSensor"
+    base_class_type="hardware_interface::SensorInterface">
+    <description>DriveLink BNO055 IMU sensor interface</description>
+  </class>
+</library>

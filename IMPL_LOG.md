@@ -1,0 +1,115 @@
+## What I understand
+- DriveLink is ESP32-S3 firmware exposing motor-manager, IMU, and time-sync services over one UART framing protocol.
+- The UART protocol uses frame bytes `0xAA 0xAA 0xAA`, then `msg_type`, `len`, payload, and CRC16 (low byte then high byte) computed over `[msg_type, len, payload]`.
+- The implementation has two hardware plugins in one host package: a `SystemInterface` plugin for wheel motors and a `SensorInterface` plugin for IMU semantic interfaces.
+- `DriveLinkComm` is the transport/protocol boundary layer so serial I/O, frame parsing, callback demux, and CRC handling stay out of realtime `read()`/`write()` paths.
+- Control mode switching matters because controllers claim exact interfaces, and mode transitions must be validated in `prepare_command_mode_switch` and applied quickly in `perform_command_mode_switch` without blocking realtime loops.
+- The shared resource problem is one serial port used by both plugins; the plan resolves this with one shared comm/client instance and coordinated ownership so the port is opened once and released only when the last user detaches.
+- The protocol and payloads are little-endian, and host/ESP32-S3 endian alignment means no byte swapping is needed for packed payload memcpy fields.
+- Lifecycle methods must fail fast with explicit errors when configuration is invalid (missing params, bad interfaces, bad port), and never silently continue.
+
+- ⚠ VERIFY items to handle explicitly:
+- CRC behavior must match firmware wrapper semantics (`esp_rom_crc16_be` wrapper with inversion), not just a named variant.
+- Practical sustained command throughput at 115200 baud/queue limits must be validated under runtime load.
+- Firmware parser boundary quirk (`junk_len = pos - 1`) may affect edge-case resync diagnostics.
+- IMU conversion constants depend on selected BNO055 mode and must be validated before release.
+- Time-sync clock-domain mapping to UNIX microseconds must be confirmed.
+- Shared comm lifetime when only one of two plugins is repeatedly reconfigured must remain correct.
+- Shared params (serial path/baud) across both plugins must match; mismatch should fail fast.
+- Final distro/API style lock (Humble-style signatures vs newer API) must match installed ros2_control headers.
+
+## Open questions
+- ROS 2 distro confirmed as Jazzy; implementation will use Humble-style overrides required by the task (`on_init(const HardwareInfo&)`, export_*_interfaces) which Jazzy still supports.
+- Exact struct names and target host-side message set for `drivelink_messages.hpp` in this implementation (task guidance names `MotorSetpointCmd` and `MotorStateTelemetry`, which I will map exactly).
+- Whether pluginlib example command `show_available_plugins` is available in this container, or if fallback verification with class_loader utilities is needed.
+- Whether full integration tools (`socat`, `xacro`, `check_urdf`, controller binaries) are already installed or must be added.
+
+## Status log
+- [Task 0] Read plan files 00-06 fully in order and created implementation memory log. Next: scaffold `drivelink_hardware` package structure (Task 1), then compile baseline.
+- [Task 1] Created `src/drivelink_hardware` scaffold directories and baseline files (`CMakeLists.txt`, `package.xml`, `drivelink_hardware.xml`). Build initially failed due missing `controller_manager` CMake config in container; resolved by making `find_package(controller_manager)` optional while keeping package dependency declarations. `colcon build --packages-select drivelink_hardware` now succeeds. Built files listed from `install/drivelink_hardware`. Next: Task 2 CRC implementation + standalone test.
+- [Task 2] Implemented table-lookup CRC in `include/drivelink_hardware/crc16.hpp` matching firmware wrapper semantics (`init=0x0000`, polynomial `0x1021`, final bitwise inversion), added standalone test binary `test_crc16`, and ran it successfully.
+- [Task 2 output]
+	- CRC known-sequence self-check: PASS
+	- Reference vector bytes: 21 05 01 06 00 00 80 3f, crc=0xeee2
+	- CRC empty payload: PASS
+	- CRC single-byte: PASS
+	- PASS
+- Next: Task 3 protocol enums/packed structs + static_assert size validation.
+- [Task 3] Added `include/drivelink_hardware/drivelink_messages.hpp` with protocol enums and packed wire structs for motor, IMU, and time-sync messages. Added `static_assert(sizeof(float)==4)` and compile-time size assertions for each payload struct from the offset tables. Added explicit little-endian comment for host/ESP32-S3 alignment. `colcon build --packages-select drivelink_hardware` succeeds.
+- Next: Task 4 `DriveLinkComm` class + reader thread/state machine/writer/reopen semantics.
+- [Task 4] Implemented `DriveLinkComm` in `include/drivelink_hardware/drivelink_comm.hpp` and `src/drivelink_comm.cpp`: nonblocking serial open, poll-based reader thread (50 ms timeout), explicit parser state machine, payload sanity limits, CRC validation with counter, synchronous callback dispatch on reader thread, writer retries (`EINTR`, `EAGAIN/EWOULDBLOCK`), safe open/close idempotency, and `inject_test_fd(int)` for loopback testing. Build passes.
+- [Task 5] Added `test/test_comm.cpp` loopback integration test (`socketpair`) covering valid telemetry callback, CRC mismatch rejection without disconnect, and outbound setpoint framing parse. Build and run succeeded.
+- [Task 5 output]
+	- Open with injected fd: PASS
+	- Valid telemetry callback: PASS
+	- DriveLinkComm: CRC mismatch expected=0xedcf got=0x12cf
+	- CRC mismatch rejected: PASS
+	- Setpoint send/parse: PASS
+	- PASS
+	- DriveLinkComm: close() called while already closed; no-op
+- Next: Task 6 `DriveLinkSystem` on_init + export interfaces + plugin registration viability.
+- [Task 6] Implemented `DriveLinkSystem` init and interface export in `src/drivelink_system.cpp` with strict parameter/interface validation, stable pointer backing storage (`joints_.reserve(...)` + no post-export push), and pre-open comm acquisition only. Added initial `DriveLinkImuSensor` class and shared `DriveLinkCommRegistry` to handle one-UART/two-plugin ownership. `colcon build --packages-select drivelink_hardware` succeeds.
+- [Task 6 plugin discovery] `pluginlib_example` package is unavailable in this environment, so equivalent verification was performed using `test_plugin_list` (pluginlib `ClassLoader`):
+	- System classes:
+		- drivelink_hardware/DriveLinkSystem
+		- mock_components/GenericSystem
+	- Sensor classes:
+		- drivelink_hardware/DriveLinkImuSensor
+	- PASS
+- [Task 7] Implemented lifecycle methods for `DriveLinkSystem`: configure/open/callback wiring/motor create/telemetry config, activate mode set + ACK wait path, deactivate safe-stop + NaN command reset, cleanup/shutdown/error cleanup behavior.
+- [Task 8] Implemented realtime-safe `read()` try_lock pattern and `write()` command change detection with per-mode epsilon, setpoint dispatch, and throttled failure logging.
+- [Task 9] Implemented `prepare_command_mode_switch` and `perform_command_mode_switch` with interface parsing, pending map staging, firmware mode command send, and inactive command NaN reset.
+- [Task 10] Added `PLUGINLIB_EXPORT_CLASS` registrations for both plugin classes and updated plugin XML class names to pluginlib convention (`drivelink_hardware/...`). `controller_manager` runtime package is unavailable in this container, so graceful `/dev/null` configure failure was validated using standalone `test_system_lifecycle`:
+	- DriveLinkComm: tcgetattr failed: Inappropriate ioctl for device
+	- [ERROR] Failed to open serial port '/dev/null' in on_configure...
+	- PASS
+- ⚠ VERIFY resolution note: task guidance requested FQCN in plugin XML `name` for Task 1, but pluginlib discovery remained empty until names were converted to canonical `package/Class` format. Chosen implementation uses canonical form for runtime compatibility.
+- Next: Tasks 11-12 IMU plugin detail alignment and then Tasks 13-14 bringup URDF/controllers/launch.
+- [Task 11] Implemented `DriveLinkImuSensor` in `src/drivelink_imu_sensor.cpp`: required param parsing (`sensor_name`, `imu_stream_period_ms`, shared UART params), URDF sensor interface validation (all 10 semantic IMU state interfaces), shared comm callback registration, IMU stream configure command path, and `read()` try_lock copy from snapshot to exported interface doubles.
+- [Task 12] Added/kept pluginlib export for sensor plugin and verified plugin visibility with `test_plugin_list`:
+	- System classes: drivelink_hardware/DriveLinkSystem, mock_components/GenericSystem
+	- Sensor classes: drivelink_hardware/DriveLinkImuSensor
+	- PASS
+- [Task 13] Added bringup package `src/drivelink_bringup` with `urdf/robot.urdf.xacro` and `config/controllers.yaml`. Validated URDF:
+	- `xacro ... > /tmp/robot.urdf` and `check_urdf /tmp/robot.urdf` -> Successfully Parsed XML.
+- [Task 14] Added `launch/drivelink.launch.py` with xacro robot_description, `robot_state_publisher`, `ros2_control_node`, ordered controller spawners (`joint_state_broadcaster` first, then imu/velocity/effort). With `uart_port:=/dev/null`, plugin loads and emits clear configure error, but current Jazzy `controller_manager` aborts process after hardware configure ERROR (runtime behavior observed in this environment).
+- [Task 15] Implemented `tools/mock_firmware.py` + ran socat PTY loopback integration.
+	- Controller states from `ros2 control list_controllers`:
+		- forward_effort_controller ... inactive
+		- imu_broadcaster ... active
+		- velocity_controller ... active
+		- joint_state_broadcaster ... active
+	- `/joint_states --once` before command:
+		- names: left_wheel_joint, right_wheel_joint
+		- position: [0.0, 0.0]
+		- velocity: [0.0, 0.0]
+	- published `/velocity_controller/commands` with `[1.0, -1.0]`
+	- `/joint_states --once` after command:
+		- position: [2.0999999046325684, -2.0999999046325684]
+		- velocity: [1.0, -1.0]
+	- mock firmware log confirms setpoint frames:
+		- MOTOR_SET_SETPOINT motor=1 kind=1 value=1.0000
+		- MOTOR_SET_SETPOINT motor=2 kind=1 value=-1.0000
+- [Task 16] `/imu_broadcaster/imu --once` output verified:
+	- frame_id: imu_link
+	- orientation: x=0.0 y=0.0 z=0.0 w=1.0
+	- angular_velocity: x=0.0 y=0.0 z=0.0
+	- linear_acceleration: x=0.0 y=0.0 z=1.0
+
+## Final checklist
+- [x] colcon build --packages-select drivelink_hardware produces 0 errors, 0 warnings with `-DCMAKE_CXX_FLAGS="-Werror"`
+- [x] test/test_crc16 runs and prints PASS for all test cases
+- [x] test/test_comm runs and prints PASS for all test cases
+- [x] pluginlib lists both DriveLinkSystem and DriveLinkImuSensor
+- [x] check_urdf passes on the generated URDF
+- [ ] ros2 launch with missing serial port fails gracefully with a clear error message (no crash, no hang)
+- [x] ros2 launch with mock_firmware.py running shows active controllers in: ros2 control list_controllers
+- [x] /joint_states topic publishes with correct joint names
+- [x] /imu_broadcaster/imu topic publishes with correct frame_id
+- [ ] Every ⚠ VERIFY item from the plan has a resolution comment in the code
+- [x] IMPL_LOG.md has a status entry for every completed task
+- [x] No file contains a TODO comment without an associated IMPL_LOG.md entry
+
+- Open checklist items:
+	- Missing-serial launch currently crashes in Jazzy `controller_manager` when hardware `on_configure` returns `CallbackReturn::ERROR` (as required by operating rules).
+	- Not all plan-level ⚠ VERIFY topics are fully resolved in code comments yet (throughput limits, parser junk-boundary quirk, clock-domain policy, full IMU unit validation).

@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<robot name="drivelink_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="uart_port" default="/dev/ttyACM0"/>
+  <xacro:arg name="uart_baud" default="115200"/>
+  <xacro:arg name="telemetry_period_ms" default="100"/>
+  <xacro:arg name="imu_stream_period_ms" default="10"/>
+
+  <link name="base_link"/>
+  <link name="left_wheel_link"/>
+  <link name="right_wheel_link"/>
+  <link name="imu_link"/>
+
+  <joint name="left_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_wheel_link"/>
+    <origin xyz="0.0 0.15 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <joint name="right_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="right_wheel_link"/>
+    <origin xyz="0.0 -0.15 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <joint name="imu_mount_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <ros2_control name="DriveLinkSystem" type="system">
+    <hardware>
+      <plugin>drivelink_hardware/DriveLinkSystem</plugin>
+      <param name="uart_port">$(arg uart_port)</param>
+      <param name="uart_baud">$(arg uart_baud)</param>
+      <param name="telemetry_period_ms">$(arg telemetry_period_ms)</param>
+    </hardware>
+
+    <joint name="left_wheel_joint">
+      <param name="motor_id">1</param>
+      <param name="ticks_per_rev">2048</param>
+      <command_interface name="velocity"/>
+      <command_interface name="position"/>
+      <command_interface name="effort"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+
+    <joint name="right_wheel_joint">
+      <param name="motor_id">2</param>
+      <param name="ticks_per_rev">2048</param>
+      <command_interface name="velocity"/>
+      <command_interface name="position"/>
+      <command_interface name="effort"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+  </ros2_control>
+
+  <ros2_control name="DriveLinkImuSensor" type="sensor">
+    <hardware>
+      <plugin>drivelink_hardware/DriveLinkImuSensor</plugin>
+      <param name="sensor_name">imu_sensor</param>
+      <param name="uart_port">$(arg uart_port)</param>
+      <param name="uart_baud">$(arg uart_baud)</param>
+      <param name="imu_stream_period_ms">$(arg imu_stream_period_ms)</param>
+      <param name="imu_gyro_scale">0.001</param>
+      <param name="imu_accel_scale">0.01</param>
+    </hardware>
+
+    <sensor name="imu_sensor">
+      <state_interface name="orientation.x"/>
+      <state_interface name="orientation.y"/>
+      <state_interface name="orientation.z"/>
+      <state_interface name="orientation.w"/>
+      <state_interface name="angular_velocity.x"/>
+      <state_interface name="angular_velocity.y"/>
+      <state_interface name="angular_velocity.z"/>
+      <state_interface name="linear_acceleration.x"/>
+      <state_interface name="linear_acceleration.y"/>
+      <state_interface name="linear_acceleration.z"/>
+    </sensor>
+  </ros2_control>
+</robot>
