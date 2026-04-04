@@ -113,3 +113,18 @@
 - Open checklist items:
 	- Missing-serial launch currently crashes in Jazzy `controller_manager` when hardware `on_configure` returns `CallbackReturn::ERROR` (as required by operating rules).
 	- Not all plan-level ⚠ VERIFY topics are fully resolved in code comments yet (throughput limits, parser junk-boundary quirk, clock-domain policy, full IMU unit validation).
+
+## Continuation status
+- [Task continuation] User fixed serial setup and corrected CRC interpretation. Verified current CRC implementation in code (`0xFFFF` init, no final inversion) and aligned `tools/mock_firmware.py` CRC to match.
+- [Task continuation] Implemented host time sync server in comm layer:
+	- Added `set_time_sync_callback(...)` API in `DriveLinkComm`.
+	- Added dispatch handling for message type `0x20` (`kTimeSyncRequest`).
+	- Added response builder and sender for `0x60` (`kTimeSyncResponse`) with echoed request data and host UNIX-microsecond RX/TX timestamps.
+	- Added code comment at implementation point documenting the clock-domain assumption (⚠ VERIFY).
+- [Task continuation] Extended `test/test_comm.cpp` with `Time sync request/response` assertion; test now validates request echo, status, IDs, and timestamp ordering.
+- [Task continuation] Extended `tools/mock_firmware.py` to periodically emit time sync requests and parse/log host time sync responses.
+- [Task continuation] Created `APT_INSTALL_LOG.md` and recorded package install events. Updated the log when `socat` had to be reinstalled in a later session.
+- [Task continuation validation]
+	- `colcon build --packages-select drivelink_hardware drivelink_bringup` passed.
+	- `./install/drivelink_hardware/lib/drivelink_hardware/test_comm` passed including time sync case.
+	- End-to-end launch with PTY loopback and mock firmware showed repeated `TIME_SYNC_RESPONSE ...` lines with matching request IDs and valid timestamps.

@@ -74,7 +74,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument('uart_port', default_value='/dev/ttyACM1'),
+        DeclareLaunchArgument('uart_port', default_value='/dev/ttyACM0'),
         DeclareLaunchArgument('uart_baud', default_value='115200'),
         DeclareLaunchArgument('telemetry_period_ms', default_value='100'),
         DeclareLaunchArgument('imu_stream_period_ms', default_value='10'),
