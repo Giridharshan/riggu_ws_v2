@@ -35,6 +35,12 @@ constexpr std::array<uint16_t, 256> make_crc16_table()
 constexpr auto kCrc16Table = make_crc16_table();
 }  // namespace detail
 
+/**
+ * @brief Compute CRC-16/CCITT-FALSE over the provided byte buffer.
+ * @param data Pointer to the input payload bytes.
+ * @param len Number of bytes in data.
+ * @return Computed 16-bit CRC value.
+ */
 inline uint16_t crc16(const uint8_t * data, size_t len)
 {
   uint16_t crc = 0xFFFF;

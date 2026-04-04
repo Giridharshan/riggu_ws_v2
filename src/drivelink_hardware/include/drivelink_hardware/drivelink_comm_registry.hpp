@@ -9,12 +9,28 @@
 namespace drivelink_hardware
 {
 
+/**
+ * @brief Process-local registry that shares one DriveLinkComm instance per UART endpoint.
+ *
+ * This helper ensures system and sensor plugins in the same process reuse the same serial
+ * transport when they are configured with identical `port` and `baudrate` parameters.
+ */
 class DriveLinkCommRegistry
 {
 public:
-  // Process-local shared comm object for one UART endpoint. The first acquire creates the
-  // instance, each acquire increments ref-count, and the final release closes and destroys it.
+  /**
+   * @brief Acquire a shared communication object for the given UART endpoint.
+   * @param port UART device path.
+   * @param baudrate UART baud rate.
+   * @return Shared DriveLinkComm instance, or nullptr on endpoint mismatch.
+   */
   static std::shared_ptr<DriveLinkComm> acquire(const std::string & port, int baudrate);
+
+  /**
+   * @brief Release a previously acquired shared communication object.
+   * @param comm Shared DriveLinkComm instance obtained from acquire().
+   * @return None.
+   */
   static void release(const std::shared_ptr<DriveLinkComm> & comm);
 
 private:

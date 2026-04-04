@@ -1,9 +1,18 @@
 #include "drivelink_hardware/drivelink_comm_registry.hpp"
 
-#include <iostream>
+#include "rclcpp/rclcpp.hpp"
 
 namespace drivelink_hardware
 {
+namespace
+{
+
+rclcpp::Logger registry_logger()
+{
+  return rclcpp::get_logger("drivelink_hardware.comm_registry");
+}
+
+}  // namespace
 
 std::mutex DriveLinkCommRegistry::mutex_;
 std::weak_ptr<DriveLinkComm> DriveLinkCommRegistry::shared_comm_;
@@ -18,9 +27,10 @@ std::shared_ptr<DriveLinkComm> DriveLinkCommRegistry::acquire(const std::string 
   auto existing = shared_comm_.lock();
   if (existing) {
     if (shared_port_ != port || shared_baudrate_ != baudrate) {
-      std::cerr << "DriveLinkCommRegistry: parameter mismatch for shared UART instance. "
-                << "existing(" << shared_port_ << ", " << shared_baudrate_ << ") requested(" << port
-                << ", " << baudrate << ")" << std::endl;
+      RCLCPP_ERROR(
+        registry_logger(),
+        "DriveLinkCommRegistry: parameter mismatch existing(%s,%d) requested(%s,%d)",
+        shared_port_.c_str(), shared_baudrate_, port.c_str(), baudrate);
       return nullptr;
     }
     ++ref_count_;

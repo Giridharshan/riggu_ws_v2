@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <limits>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -9,36 +11,118 @@
 #include "hardware_interface/system_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
+#include "drivelink_hardware/constants.hpp"
 #include "drivelink_hardware/drivelink_comm.hpp"
 
 namespace drivelink_hardware
 {
 
+/**
+ * @brief ROS 2 control system plugin for DriveLink motor joints.
+ *
+ * Owns joint configuration parsing, lifecycle transitions, command-mode switching, and runtime
+ * read/write interactions with firmware through DriveLinkComm.
+ */
 class DriveLinkSystem : public hardware_interface::SystemInterface
 {
 public:
+  /**
+   * @brief Initialize hardware configuration from URDF hardware info.
+   * @param info Hardware component metadata and parameters.
+   * @return SUCCESS when all required parameters/interfaces are valid.
+   */
   hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareInfo & info) override;
 
+  /**
+   * @brief Export joint state interfaces.
+   * @return Vector of exported state interfaces.
+   */
   std::vector<hardware_interface::StateInterface> export_state_interfaces() override;
+
+  /**
+   * @brief Export joint command interfaces.
+   * @return Vector of exported command interfaces.
+   */
   std::vector<hardware_interface::CommandInterface> export_command_interfaces() override;
 
+  /**
+   * @brief Configure communication and firmware-side motor configuration.
+   * @param previous_state Previous lifecycle state.
+   * @return SUCCESS when configuration completes.
+   */
   hardware_interface::CallbackReturn on_configure(
     const rclcpp_lifecycle::State & previous_state) override;
+
+  /**
+   * @brief Activate command streaming and initialize runtime state.
+   * @param previous_state Previous lifecycle state.
+   * @return SUCCESS when activation completes.
+   */
   hardware_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State & previous_state) override;
+
+  /**
+   * @brief Deactivate command streaming and stop motors safely.
+   * @param previous_state Previous lifecycle state.
+   * @return SUCCESS when deactivation completes.
+   */
   hardware_interface::CallbackReturn on_deactivate(
     const rclcpp_lifecycle::State & previous_state) override;
+
+  /**
+   * @brief Cleanup resources after deactivation.
+   * @param previous_state Previous lifecycle state.
+   * @return SUCCESS when cleanup completes.
+   */
   hardware_interface::CallbackReturn on_cleanup(const rclcpp_lifecycle::State & previous_state) override;
+
+  /**
+   * @brief Shutdown the hardware interface and release resources.
+   * @param previous_state Previous lifecycle state.
+   * @return SUCCESS when shutdown completes.
+   */
   hardware_interface::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & previous_state) override;
+
+  /**
+   * @brief Handle error transition by stopping motors and releasing resources.
+   * @param previous_state Previous lifecycle state.
+   * @return SUCCESS after error handling.
+   */
   hardware_interface::CallbackReturn on_error(const rclcpp_lifecycle::State & previous_state) override;
 
+  /**
+   * @brief Publish latest motor states into exported state interfaces.
+   * @param time Current controller time.
+   * @param period Control period.
+   * @return OK when read step is complete.
+   */
   hardware_interface::return_type read(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
+
+  /**
+   * @brief Push commands from exported command interfaces to firmware.
+   * @param time Current controller time.
+   * @param period Control period.
+   * @return OK on successful command write cycle, ERROR otherwise.
+   */
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  /**
+   * @brief Validate and stage command-mode transitions.
+   * @param start_interfaces Interfaces requested to start.
+   * @param stop_interfaces Interfaces requested to stop.
+   * @return OK when requested transitions are valid.
+   */
   hardware_interface::return_type prepare_command_mode_switch(
     const std::vector<std::string> & start_interfaces,
     const std::vector<std::string> & stop_interfaces) override;
+
+  /**
+   * @brief Execute staged command-mode transitions on firmware.
+   * @param start_interfaces Interfaces requested to start.
+   * @param stop_interfaces Interfaces requested to stop.
+   * @return OK when transitions are successfully applied.
+   */
   hardware_interface::return_type perform_command_mode_switch(
     const std::vector<std::string> & start_interfaces,
     const std::vector<std::string> & stop_interfaces) override;
@@ -93,8 +177,8 @@ private:
   std::vector<JointContext> joints_;
 
   std::string uart_port_;
-  int uart_baud_{115200};
-  int telemetry_period_ms_{100};
+  int uart_baud_{constants::kDefaultUartBaud};
+  int telemetry_period_ms_{constants::kDefaultTelemetryPeriodMs};
 
   std::shared_ptr<DriveLinkComm> comm_;
 
