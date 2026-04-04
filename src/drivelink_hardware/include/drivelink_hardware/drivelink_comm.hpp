@@ -22,6 +22,8 @@ public:
   using MotorStateCallback = std::function<void(const MotorStateTelemetry &)>;
   using MotorResponseCallback = std::function<void(const MotorConfigureResponse &)>;
   using ImuTelemetryCallback = std::function<void(const std::vector<uint8_t> &)>;
+  using TimeSyncCallback =
+    std::function<void(const TimeSyncRequestPayload &, const TimeSyncResponsePayload &)>;
 
   explicit DriveLinkComm(std::string port = "/dev/ttyUSB0", int baudrate = 115200);
   ~DriveLinkComm();
@@ -35,6 +37,7 @@ public:
   void set_motor_state_callback(MotorStateCallback callback);
   void set_motor_response_callback(MotorResponseCallback callback);
   void set_imu_telemetry_callback(ImuTelemetryCallback callback);
+  void set_time_sync_callback(TimeSyncCallback callback);
 
   bool send_frame(uint8_t msg_type, const uint8_t * payload, size_t payload_len);
   bool send_frame(uint8_t msg_type, const std::vector<uint8_t> & payload);
@@ -77,6 +80,7 @@ private:
   void reset_parser_state();
   void dispatch_frame(uint8_t msg_type, const std::vector<uint8_t> & payload);
   void parse_motor_telemetry_payload(const std::vector<uint8_t> & payload);
+  void handle_time_sync_request(const std::vector<uint8_t> & payload);
 
   std::string port_;
   int baudrate_;
@@ -98,6 +102,7 @@ private:
   MotorStateCallback motor_state_callback_;
   MotorResponseCallback motor_response_callback_;
   ImuTelemetryCallback imu_telemetry_callback_;
+  TimeSyncCallback time_sync_callback_;
 
   ParserState parser_state_;
   uint8_t parser_msg_type_;

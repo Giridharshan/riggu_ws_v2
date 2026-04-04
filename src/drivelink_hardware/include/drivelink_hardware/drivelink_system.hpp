@@ -48,7 +48,7 @@ private:
   {
     std::string name;
     uint8_t motor_id{0};
-    double ticks_per_rev{0.0};
+    MotorCreateOrConfigureBody motor_create_config{};
 
     double state_position{0.0};
     double state_velocity{0.0};

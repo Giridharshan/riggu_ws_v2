@@ -40,7 +40,22 @@
 
     <joint name="left_wheel_joint">
       <param name="motor_id">1</param>
-      <param name="ticks_per_rev">2048</param>
+      <param name="counts_per_rev">2048</param>
+      <param name="pwm_gpio">0</param>
+      <param name="dir_gpio">0</param>
+      <param name="enc_a">0</param>
+      <param name="enc_b">0</param>
+      <param name="gear_ratio">1.0</param>
+      <param name="output_min">-1.0</param>
+      <param name="output_max">1.0</param>
+      <param name="vel_kp">0.0</param>
+      <param name="vel_ki">0.0</param>
+      <param name="vel_kd">0.0</param>
+      <param name="pos_kp">0.0</param>
+      <param name="pos_ki">0.0</param>
+      <param name="pos_kd">0.0</param>
+      <param name="velocity_feedforward">0.0</param>
+      <param name="position_feedforward">0.0</param>
       <command_interface name="velocity"/>
       <command_interface name="position"/>
       <command_interface name="effort"/>
@@ -51,7 +66,22 @@
 
     <joint name="right_wheel_joint">
       <param name="motor_id">2</param>
-      <param name="ticks_per_rev">2048</param>
+      <param name="counts_per_rev">2048</param>
+      <param name="pwm_gpio">15</param>
+      <param name="dir_gpio">16</param>
+      <param name="enc_a">17</param>
+      <param name="enc_b">18</param>
+      <param name="gear_ratio">1.0</param>
+      <param name="output_min">-1.0</param>
+      <param name="output_max">1.0</param>
+      <param name="vel_kp">0.0</param>
+      <param name="vel_ki">0.0</param>
+      <param name="vel_kd">0.0</param>
+      <param name="pos_kp">0.0</param>
+      <param name="pos_ki">0.0</param>
+      <param name="pos_kd">0.0</param>
+      <param name="velocity_feedforward">0.0</param>
+      <param name="position_feedforward">0.0</param>
       <command_interface name="velocity"/>
       <command_interface name="position"/>
       <command_interface name="effort"/>

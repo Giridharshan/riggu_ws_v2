@@ -64,21 +64,92 @@ hardware_interface::CallbackReturn DriveLinkSystem::on_init(const hardware_inter
     }
 
     uint8_t motor_id = 0;
-    double ticks_per_rev = 0.0;
-    if (!parse_uint8_param(joint_info.parameters, "motor_id", motor_id) ||
-      !parse_double_param(joint_info.parameters, "ticks_per_rev", ticks_per_rev))
+    if (!parse_uint8_param(joint_info.parameters, "motor_id", motor_id))
     {
       RCLCPP_ERROR(
         get_logger(),
-        "Joint '%s' missing required params: motor_id and ticks_per_rev.",
+        "Joint '%s' missing required param: motor_id.",
         joint_info.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
+    }
+
+    MotorCreateOrConfigureBody create_config{};
+    create_config.gear_ratio = 1.0F;
+    create_config.output_min = -1.0F;
+    create_config.output_max = 1.0F;
+    create_config.sample_time_ms = static_cast<uint32_t>(telemetry_period_ms_);
+
+    double counts_per_rev = 0.0;
+    const bool has_counts_per_rev =
+      parse_double_param(joint_info.parameters, "counts_per_rev", counts_per_rev);
+    const bool has_legacy_ticks_per_rev =
+      parse_double_param(joint_info.parameters, "ticks_per_rev", counts_per_rev);
+    if (!has_counts_per_rev && !has_legacy_ticks_per_rev) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "Joint '%s' missing required param: counts_per_rev (legacy alias: ticks_per_rev).",
+        joint_info.name.c_str());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    create_config.counts_per_rev = static_cast<float>(counts_per_rev);
+
+    {
+      uint8_t parsed = 0;
+      if (parse_uint8_param(joint_info.parameters, "pwm_gpio", parsed)) {
+        create_config.pwm_gpio = parsed;
+      }
+      if (parse_uint8_param(joint_info.parameters, "dir_gpio", parsed)) {
+        create_config.dir_gpio = parsed;
+      }
+      if (parse_uint8_param(joint_info.parameters, "enc_a", parsed)) {
+        create_config.enc_a = parsed;
+      }
+      if (parse_uint8_param(joint_info.parameters, "enc_b", parsed)) {
+        create_config.enc_b = parsed;
+      }
+    }
+
+    {
+      double parsed = 0.0;
+      if (parse_double_param(joint_info.parameters, "gear_ratio", parsed)) {
+        create_config.gear_ratio = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "output_min", parsed)) {
+        create_config.output_min = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "output_max", parsed)) {
+        create_config.output_max = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "vel_kp", parsed)) {
+        create_config.vel_kp = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "vel_ki", parsed)) {
+        create_config.vel_ki = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "vel_kd", parsed)) {
+        create_config.vel_kd = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "pos_kp", parsed)) {
+        create_config.pos_kp = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "pos_ki", parsed)) {
+        create_config.pos_ki = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "pos_kd", parsed)) {
+        create_config.pos_kd = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "velocity_feedforward", parsed)) {
+        create_config.velocity_feedforward = static_cast<float>(parsed);
+      }
+      if (parse_double_param(joint_info.parameters, "position_feedforward", parsed)) {
+        create_config.position_feedforward = static_cast<float>(parsed);
+      }
     }
 
     JointContext joint;
     joint.name = joint_info.name;
     joint.motor_id = motor_id;
-    joint.ticks_per_rev = ticks_per_rev;
+    joint.motor_create_config = create_config;
     joints_.emplace_back(joint);
   }
 
@@ -148,12 +219,7 @@ hardware_interface::CallbackReturn DriveLinkSystem::on_configure(
   }
 
   for (const auto & joint : joints_) {
-    MotorCreateOrConfigureBody body{};
-    body.counts_per_rev = static_cast<float>(joint.ticks_per_rev);
-    body.gear_ratio = 1.0F;
-    body.output_min = -1.0F;
-    body.output_max = 1.0F;
-    body.sample_time_ms = static_cast<uint32_t>(telemetry_period_ms_);
+    MotorCreateOrConfigureBody body = joint.motor_create_config;
 
     // ⚠ VERIFY: firmware protocol does not expose an explicit telemetry-period command for motors.
     // Assumption: sample_time_ms in create/configure body provides desired update cadence.

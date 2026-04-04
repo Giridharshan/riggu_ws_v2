@@ -201,6 +201,12 @@ void DriveLinkComm::set_imu_telemetry_callback(ImuTelemetryCallback callback)
   imu_telemetry_callback_ = std::move(callback);
 }
 
+void DriveLinkComm::set_time_sync_callback(TimeSyncCallback callback)
+{
+  std::lock_guard<std::mutex> lock(callback_mutex_);
+  time_sync_callback_ = std::move(callback);
+}
+
 bool DriveLinkComm::send_frame(uint8_t msg_type, const std::vector<uint8_t> & payload)
 {
   return send_frame(msg_type, payload.data(), payload.size());
@@ -565,6 +571,62 @@ void DriveLinkComm::dispatch_frame(uint8_t msg_type, const std::vector<uint8_t> 
       callback(payload);
     }
     return;
+  }
+
+  if (msg_type == static_cast<uint8_t>(MessageType::kTimeSyncRequest)) {
+    handle_time_sync_request(payload);
+    return;
+  }
+}
+
+void DriveLinkComm::handle_time_sync_request(const std::vector<uint8_t> & payload)
+{
+  if (payload.size() != sizeof(TimeSyncRequestPayload)) {
+    std::cerr << "DriveLinkComm: invalid time sync request payload size: " << payload.size()
+              << std::endl;
+    return;
+  }
+
+  TimeSyncRequestPayload request{};
+  std::memcpy(&request, payload.data(), sizeof(request));
+
+  const auto now_rx = std::chrono::system_clock::now();
+  const auto rx_us = std::chrono::duration_cast<std::chrono::microseconds>(
+    now_rx.time_since_epoch()).count();
+
+  TimeSyncResponsePayload response{};
+  response.version = request.version;
+  response.status = 0;
+  response.request_id = request.request_id;
+  response.echoed_client_unix_send_us = request.client_unix_send_us;
+
+  // ⚠ VERIFY: firmware expects UNIX microseconds. This implementation maps host
+  // system_clock to UNIX epoch microseconds for both RX and TX timestamps.
+  response.server_unix_rx_us = static_cast<int64_t>(rx_us);
+
+  const auto now_tx = std::chrono::system_clock::now();
+  const auto tx_us = std::chrono::duration_cast<std::chrono::microseconds>(
+    now_tx.time_since_epoch()).count();
+  response.server_unix_tx_us = static_cast<int64_t>(tx_us);
+  response.reserved0 = 0;
+  response.reserved1 = 0;
+
+  if (!send_frame(
+      static_cast<uint8_t>(MessageType::kTimeSyncResponse),
+      reinterpret_cast<const uint8_t *>(&response), sizeof(response)))
+  {
+    std::cerr << "DriveLinkComm: failed to send time sync response for request_id="
+              << request.request_id << std::endl;
+    return;
+  }
+
+  TimeSyncCallback callback;
+  {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    callback = time_sync_callback_;
+  }
+  if (callback) {
+    callback(request, response);
   }
 }
 

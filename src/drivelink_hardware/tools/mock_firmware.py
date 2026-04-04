@@ -16,6 +16,8 @@ MSG_MOTOR_TELEMETRY_STREAM = 0x81
 MSG_IMU_CONFIG = 0x22
 MSG_IMU_RESP = 0x42
 MSG_IMU_STREAM = 0x82
+MSG_TIME_SYNC_REQ = 0x20
+MSG_TIME_SYNC_RESP = 0x60
 
 SUB_MOTOR_SET_MODE = 0x04
 SUB_MOTOR_SET_SETPOINT = 0x06
@@ -29,7 +31,7 @@ SETPOINT_KIND_VEL = 1
 
 
 def crc16(data: bytes) -> int:
-    crc = 0x0000
+    crc = 0xFFFF
     for b in data:
         crc ^= (b << 8)
         for _ in range(8):
@@ -37,7 +39,7 @@ def crc16(data: bytes) -> int:
                 crc = ((crc << 1) ^ 0x1021) & 0xFFFF
             else:
                 crc = (crc << 1) & 0xFFFF
-    return (~crc) & 0xFFFF
+    return crc & 0xFFFF
 
 
 def make_frame(msg_type: int, payload: bytes) -> bytes:
@@ -83,6 +85,9 @@ class MockFirmware:
 
         self.last_motor_tx = time.monotonic()
         self.last_imu_tx = time.monotonic()
+        self.last_time_sync_tx = time.monotonic()
+        self.time_sync_period_s = 1.0
+        self.time_sync_request_id = 1
 
     def close(self) -> None:
         os.close(self.fd)
@@ -130,6 +135,12 @@ class MockFirmware:
         raw_gyro = (0, 0, 0)
         payload = struct.pack('<BHQhhhhhhhhhh', 1, field_mask, now_us, *quat, *lin_acc, *raw_gyro)
         self.send(MSG_IMU_STREAM, payload)
+
+    def send_time_sync_request(self) -> None:
+        now_us = int(time.time() * 1e6)
+        payload = struct.pack('<BBHq', 1, 0, self.time_sync_request_id, now_us)
+        self.send(MSG_TIME_SYNC_REQ, payload)
+        self.time_sync_request_id = (self.time_sync_request_id + 1) & 0xFFFF
 
     def parse_frames(self):
         while True:
@@ -218,6 +229,16 @@ class MockFirmware:
             self.send_imu_response(version, subcmd, 0)
             return
 
+        if msg_type == MSG_TIME_SYNC_RESP:
+            if len(payload) != 30:
+                return
+            version, status, request_id = struct.unpack('<BBH', payload[:4])
+            client_send_us, server_rx_us, server_tx_us = struct.unpack('<qqq', payload[4:28])
+            print(
+                f"TIME_SYNC_RESPONSE ver={version} status={status} req={request_id} "
+                f"client_send_us={client_send_us} server_rx_us={server_rx_us} server_tx_us={server_tx_us}")
+            return
+
     def spin(self) -> None:
         print("mock_firmware ready")
         while True:
@@ -229,6 +250,10 @@ class MockFirmware:
             if self.imu_stream_enabled and (now - self.last_imu_tx) >= self.imu_period_s:
                 self.send_imu_telemetry()
                 self.last_imu_tx = now
+
+            if (now - self.last_time_sync_tx) >= self.time_sync_period_s:
+                self.send_time_sync_request()
+                self.last_time_sync_tx = now
 
             rlist, _, _ = select.select([self.fd], [], [], 0.01)
             if self.fd in rlist:

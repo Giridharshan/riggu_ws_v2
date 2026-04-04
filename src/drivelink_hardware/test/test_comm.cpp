@@ -146,6 +146,41 @@ int main()
   print_case("Setpoint send/parse", send_parse_ok);
   all_pass = all_pass && send_parse_ok;
 
+  const drivelink_hardware::TimeSyncRequestPayload time_sync_req = {
+    0x01,
+    0x00,
+    0x1234,
+    1700000000000000LL};
+  const auto time_sync_frame = make_frame(
+    static_cast<uint8_t>(drivelink_hardware::MessageType::kTimeSyncRequest),
+    reinterpret_cast<const uint8_t *>(&time_sync_req), sizeof(time_sync_req));
+
+  const bool wrote_time_sync = write_all(fds[1], time_sync_frame);
+
+  uint8_t ts_rx_buf[96];
+  const ssize_t ts_read_n = ::read(fds[1], ts_rx_buf, sizeof(ts_rx_buf));
+  bool time_sync_ok = false;
+  if (wrote_time_sync && ts_read_n > 0) {
+    const size_t n = static_cast<size_t>(ts_read_n);
+    if (
+      n >= 7 + sizeof(drivelink_hardware::TimeSyncResponsePayload) &&
+      ts_rx_buf[0] == kDriveLinkStartByte && ts_rx_buf[1] == kDriveLinkStartByte &&
+      ts_rx_buf[2] == kDriveLinkStartByte &&
+      ts_rx_buf[3] == static_cast<uint8_t>(drivelink_hardware::MessageType::kTimeSyncResponse) &&
+      ts_rx_buf[4] == sizeof(drivelink_hardware::TimeSyncResponsePayload))
+    {
+      drivelink_hardware::TimeSyncResponsePayload response{};
+      std::memcpy(&response, ts_rx_buf + 5, sizeof(response));
+      time_sync_ok =
+        response.version == time_sync_req.version && response.status == 0 &&
+        response.request_id == time_sync_req.request_id &&
+        response.echoed_client_unix_send_us == time_sync_req.client_unix_send_us &&
+        response.server_unix_tx_us >= response.server_unix_rx_us;
+    }
+  }
+  print_case("Time sync request/response", time_sync_ok);
+  all_pass = all_pass && time_sync_ok;
+
   comm.close();
   ::close(fds[1]);
 
