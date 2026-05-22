@@ -89,8 +89,6 @@ install(FILES drivelink_hardware.xml
 install(PROGRAMS tools/mock_firmware.py
   DESTINATION lib/${PROJECT_NAME}/tools)
 
-install(DIRECTORY config launch urdf
-  DESTINATION share/${PROJECT_NAME})
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
