@@ -62,3 +62,4 @@ Detailed guides for every part of Riggu live in [`docs/`](docs/):
 | [**4. `drivelink_v2` ESP-IDF Firmware**](docs/04-firmware-drivelink-v2.md) | ESP32-S3 firmware components (`uart_comm`, `motor_hal`, `rotary_encoder_hal`, `pid`, `motor_manager`, `imu_bmo_055`, `time_sync`) and flashing |
 | [**5. Running the Bot**](docs/05-running-the-bot.md) | Exact step-by-step commands for base bringup, straight-drive motor tests, SLAM mapping, autonomous Nav2 navigation, and RViz2 |
 | [**6. Errors & Fixes Log**](docs/06-troubleshooting-and-fixes.md) | Every major ROS 2 Jazzy, Nav2, `ros2_control`, ESP32, and Raspberry Pi 5 issue encountered on Riggu and how it was solved |
+| [**7. Things to Improve**](docs/07-things-to-improve.md) | Future improvements roadmap, including how to re-integrate BNO055 IMU onto the ESP32-S3 cleanly, udev rules, PID tuning, and Nav2 optimization |
