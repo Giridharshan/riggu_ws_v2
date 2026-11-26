@@ -5,31 +5,236 @@
   <xacro:arg name="telemetry_period_ms" default="100"/>
   <xacro:arg name="imu_stream_period_ms" default="10"/>
 
-  <link name="base_link"/>
-  <link name="left_wheel_link"/>
-  <link name="right_wheel_link"/>
-  <link name="imu_link"/>
+  <!-- ==================== MATERIALS ==================== -->
+  <material name="acrylic_dark">
+    <color rgba="0.15 0.15 0.18 0.9"/>
+  </material>
+  <material name="aluminum_2020">
+    <color rgba="0.82 0.82 0.84 1.0"/>
+  </material>
+  <material name="rubber_black">
+    <color rgba="0.08 0.08 0.08 1.0"/>
+  </material>
+  <material name="wheel_rim">
+    <color rgba="0.85 0.25 0.15 1.0"/>
+  </material>
+  <material name="caster_steel">
+    <color rgba="0.6 0.6 0.65 1.0"/>
+  </material>
+  <material name="imu_purple">
+    <color rgba="0.5 0.1 0.7 1.0"/>
+  </material>
+  <material name="rplidar_black">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+  <material name="rplidar_lens">
+    <color rgba="0.1 0.3 0.6 0.8"/>
+  </material>
 
+  <!-- ==================== BASE_LINK, PLATES & 2020 FRAME ==================== -->
+  <link name="base_link">
+    <!-- BOTTOM PLATE (3cm ABOVE motor shaft at z = +0.03m, 33cm long x 30cm wide x 4mm thick) -->
+    <visual>
+      <origin xyz="0.135 0.0 0.03" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.33 0.30 0.004"/>
+      </geometry>
+      <material name="acrylic_dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0.135 0.0 0.03" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.33 0.30 0.004"/>
+      </geometry>
+    </collision>
+
+    <!-- TOP BASE PLATE (12cm above bottom plate, at z = +0.15m) -->
+    <visual>
+      <origin xyz="0.135 0.0 0.15" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.33 0.30 0.004"/>
+      </geometry>
+      <material name="acrylic_dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0.135 0.0 0.15" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.33 0.30 0.004"/>
+      </geometry>
+    </collision>
+
+    <!-- 4x VERTICAL 2020 EXTRUSION PILLARS (2cm x 2cm x 12cm tall) -->
+    <visual>
+      <origin xyz="0.285 0.135 0.09" rpy="0 0 0"/>
+      <geometry><box size="0.02 0.02 0.12"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+    <visual>
+      <origin xyz="0.285 -0.135 0.09" rpy="0 0 0"/>
+      <geometry><box size="0.02 0.02 0.12"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+    <visual>
+      <origin xyz="-0.015 0.135 0.09" rpy="0 0 0"/>
+      <geometry><box size="0.02 0.02 0.12"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+    <visual>
+      <origin xyz="-0.015 -0.135 0.09" rpy="0 0 0"/>
+      <geometry><box size="0.02 0.02 0.12"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+
+    <!-- 2020 ALUMINUM HORIZONTAL PERIMETER RAILS -->
+    <visual>
+      <origin xyz="0.135 0.135 0.042" rpy="0 0 0"/>
+      <geometry><box size="0.32 0.02 0.02"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+    <visual>
+      <origin xyz="0.135 -0.135 0.042" rpy="0 0 0"/>
+      <geometry><box size="0.32 0.02 0.02"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+    <visual>
+      <origin xyz="0.285 0.0 0.042" rpy="0 0 0"/>
+      <geometry><box size="0.02 0.25 0.02"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+    <visual>
+      <origin xyz="-0.015 0.0 0.042" rpy="0 0 0"/>
+      <geometry><box size="0.02 0.25 0.02"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+
+    <!-- FRONT CASTER ASSEMBLY (3cm from front edge, touching ground at z = -0.06m) -->
+    <visual>
+      <origin xyz="0.27 0.0 -0.005" rpy="0 0 0"/>
+      <geometry><box size="0.04 0.04 0.066"/></geometry>
+      <material name="aluminum_2020"/>
+    </visual>
+    <visual>
+      <origin xyz="0.27 0.0 -0.038" rpy="0 0 0"/>
+      <geometry><sphere radius="0.022"/></geometry>
+      <material name="caster_steel"/>
+    </visual>
+  </link>
+
+  <!-- ==================== LEFT WHEEL (12cm Dia = 6cm Radius) ==================== -->
+  <link name="left_wheel_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5707963 0 0"/>
+      <geometry>
+        <cylinder radius="0.06" length="0.025"/>
+      </geometry>
+      <material name="rubber_black"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0.001 0" rpy="1.5707963 0 0"/>
+      <geometry>
+        <cylinder radius="0.035" length="0.026"/>
+      </geometry>
+      <material name="wheel_rim"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963 0 0"/>
+      <geometry>
+        <cylinder radius="0.06" length="0.025"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- ==================== RIGHT WHEEL (12cm Dia = 6cm Radius) ==================== -->
+  <link name="right_wheel_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5707963 0 0"/>
+      <geometry>
+        <cylinder radius="0.06" length="0.025"/>
+      </geometry>
+      <material name="rubber_black"/>
+    </visual>
+    <visual>
+      <origin xyz="0 -0.001 0" rpy="1.5707963 0 0"/>
+      <geometry>
+        <cylinder radius="0.035" length="0.026"/>
+      </geometry>
+      <material name="wheel_rim"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963 0 0"/>
+      <geometry>
+        <cylinder radius="0.06" length="0.025"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- ==================== IMU SENSOR (Center of Base Plate) ==================== -->
+  <link name="imu_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.025 0.025 0.004"/>
+      </geometry>
+      <material name="imu_purple"/>
+    </visual>
+  </link>
+
+  <!-- ==================== SLAMTEC RPLIDAR C1 (Front Center) ==================== -->
+  <link name="laser">
+    <visual>
+      <origin xyz="0 0 0.013" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.028" length="0.026"/>
+      </geometry>
+      <material name="rplidar_black"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0.030" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.024" length="0.015"/>
+      </geometry>
+      <material name="rplidar_lens"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.028" length="0.041"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- ==================== JOINTS ==================== -->
+  <!-- Left Wheel (y = +0.15m) -->
   <joint name="left_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="left_wheel_link"/>
-    <origin xyz="0.0 0.15 0.0" rpy="0 0 0"/>
+    <origin xyz="0.0 0.20 0.0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
+  <!-- Right Wheel (y = -0.15m) -->
   <joint name="right_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="right_wheel_link"/>
-    <origin xyz="0.0 -0.15 0.0" rpy="0 0 0"/>
+    <origin xyz="0.0 -0.20 0.0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
+  <!-- IMU: Exact Center of Top Base Plate (x = +0.135m, y = 0.0, z = +0.152m) -->
   <joint name="imu_mount_joint" type="fixed">
     <parent link="base_link"/>
     <child link="imu_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <origin xyz="0.135 0.0 0.152" rpy="0 0 0"/>
   </joint>
 
+  <!-- RPLidar C1: Front Center of Top Base Plate (x = +0.26m, y = 0.0, z = +0.152m) -->
+  <joint name="lidar_mount_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser"/>
+    <origin xyz="0.25 0.0 0.152" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ==================== ROS 2 CONTROL ==================== -->
   <ros2_control name="DriveLinkSystem" type="system">
     <hardware>
       <plugin>drivelink_hardware/DriveLinkSystem</plugin>
@@ -40,17 +245,17 @@
 
     <joint name="left_wheel_joint">
       <param name="motor_id">1</param>
-      <param name="counts_per_rev">2048</param>
-      <param name="pwm_gpio">0</param>
-      <param name="dir_gpio">0</param>
-      <param name="enc_a">0</param>
-      <param name="enc_b">0</param>
-      <param name="gear_ratio">1.0</param>
+      <param name="counts_per_rev">28</param>
+      <param name="pwm_gpio">11</param>
+      <param name="dir_gpio">12</param>
+      <param name="enc_a">4</param>
+      <param name="enc_b">5</param>
+      <param name="gear_ratio">264.0</param>
       <param name="output_min">-1.0</param>
       <param name="output_max">1.0</param>
-      <param name="vel_kp">0.0</param>
-      <param name="vel_ki">0.0</param>
-      <param name="vel_kd">0.0</param>
+      <param name="vel_kp">0.6</param>
+      <param name="vel_ki">0.15</param>
+      <param name="vel_kd">0.01</param>
       <param name="pos_kp">0.0</param>
       <param name="pos_ki">0.0</param>
       <param name="pos_kd">0.0</param>
@@ -66,17 +271,17 @@
 
     <joint name="right_wheel_joint">
       <param name="motor_id">2</param>
-      <param name="counts_per_rev">2048</param>
+      <param name="counts_per_rev">28</param>
       <param name="pwm_gpio">15</param>
       <param name="dir_gpio">16</param>
-      <param name="enc_a">17</param>
-      <param name="enc_b">18</param>
-      <param name="gear_ratio">1.0</param>
+      <param name="enc_a">7</param>
+      <param name="enc_b">6</param>
+      <param name="gear_ratio">264.0</param>
       <param name="output_min">-1.0</param>
       <param name="output_max">1.0</param>
-      <param name="vel_kp">0.0</param>
-      <param name="vel_ki">0.0</param>
-      <param name="vel_kd">0.0</param>
+      <param name="vel_kp">0.60</param>
+      <param name="vel_ki">0.15</param>
+      <param name="vel_kd">0.01</param>
       <param name="pos_kp">0.0</param>
       <param name="pos_ki">0.0</param>
       <param name="pos_kd">0.0</param>

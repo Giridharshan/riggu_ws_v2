@@ -1,3 +1,4 @@
+#include <cmath>
 #include "drivelink_hardware/drivelink_imu_sensor.hpp"
 
 #include <cstring>

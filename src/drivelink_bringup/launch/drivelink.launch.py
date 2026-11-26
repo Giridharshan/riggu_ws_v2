@@ -3,6 +3,7 @@ from launch.actions import DeclareLaunchArgument, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -15,14 +16,18 @@ def generate_launch_description():
     bringup_share = FindPackageShare('drivelink_bringup')
     xacro_file = PathJoinSubstitution([bringup_share, 'urdf', 'robot.urdf.xacro'])
     controllers_file = PathJoinSubstitution([bringup_share, 'config', 'controllers.yaml'])
+    ekf_config_path = PathJoinSubstitution([bringup_share, 'config', 'ekf.yaml'])
 
-    robot_description = Command([
+    robot_description = ParameterValue(
+        Command([
         'xacro ', xacro_file,
         ' uart_port:=', uart_port,
         ' uart_baud:=', uart_baud,
         ' telemetry_period_ms:=', telemetry_period_ms,
         ' imu_stream_period_ms:=', imu_stream_period_ms,
-    ])
+    ]),
+        value_type=str
+    )
 
     rsp = Node(
         package='robot_state_publisher',
@@ -66,6 +71,36 @@ def generate_launch_description():
         output='screen',
     )
 
+            # 1. Protection layer (catches bad IMU / wheel slip)
+    validator = Node(
+        package='drivelink_bringup',
+        executable='sensor_validator.py',
+        name='sensor_validator',
+        output='screen',
+    )
+
+        # 2. Sensor Fusion (fuses BNO055 + Wheels)
+    ekf_stuff = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_filter_node',
+        output='screen',
+        parameters=[ekf_config_path],
+    )
+
+    bno055_node = Node(
+        package='drivelink_bringup',
+        executable='bno055_pi.py',
+        name='bno055_pi_node',
+        output='screen',
+        parameters=[{
+            'frame_id': 'imu_link',
+            'publish_rate_hz': 50.0,
+            'topic_name': '/bno055/imu',
+        }],
+    )
+    
+
     spawn_after_joint_state = RegisterEventHandler(
         OnProcessExit(
             target_action=joint_state_spawner,
@@ -82,4 +117,7 @@ def generate_launch_description():
         control_node,
         joint_state_spawner,
         spawn_after_joint_state,
+	bno055_node,
+	ekf_stuff,
+	validator,
     ])

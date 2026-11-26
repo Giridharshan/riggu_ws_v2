@@ -9,7 +9,7 @@ controller_manager:
       type: imu_sensor_broadcaster/IMUSensorBroadcaster
 
     velocity_controller:
-      type: forward_command_controller/ForwardCommandController
+      type: diff_drive_controller/DiffDriveController
 
     forward_effort_controller:
       type: forward_command_controller/ForwardCommandController
@@ -21,11 +21,16 @@ imu_broadcaster:
 
 velocity_controller:
   ros__parameters:
-    joints:
-      - left_wheel_joint
-      - right_wheel_joint
-    interface_name: velocity
+    left_wheel_names: ["left_wheel_joint"]
+    right_wheel_names: ["right_wheel_joint"]
 
+    wheel_separation: 0.40
+    wheel_radius: 0.06
+
+    use_stamped_vel: true
+    cmd_vel_timeout: 0.5
+    enable_odom_tf: false
+    allow_integration_in_stopped_state: true   
 forward_effort_controller:
   ros__parameters:
     joints:
