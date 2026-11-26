@@ -1,0 +1,73 @@
+menu "Motor Manager Configuration"
+
+    config MOTOR_MANAGER_CONFIGURE_MSG_TYPE
+        hex "Configure command message type"
+        default 0x21
+        range 0x01 0x3F
+        help
+            UART message type used for motor manager configure requests
+            (command class range 0x01..0x3F).
+
+    config MOTOR_MANAGER_CONFIGURE_RESPONSE_MSG_TYPE
+        hex "Configure response message type"
+        default 0x61
+        range 0x40 0x7F
+        help
+            UART message type used for motor manager configure responses
+            (response class range 0x40..0x7F).
+
+    config MOTOR_MANAGER_SETPOINT_STREAM_CHANNEL
+        hex "Setpoint stream channel"
+        default 0x80
+        range 0x80 0xBF
+        help
+            UART stream channel for setpoint data from host to target
+            (stream class range 0x80..0xBF).
+
+    config MOTOR_MANAGER_TELEMETRY_STREAM_CHANNEL
+        hex "Telemetry stream channel"
+        default 0x81
+        range 0x80 0xBF
+        help
+            UART stream channel for telemetry data from target to host
+            (stream class range 0x80..0xBF).
+
+    config MOTOR_MANAGER_USE_MOCK_FEEDBACK
+        bool "Use setpoint-backed mock telemetry"
+        default n
+        help
+            Enables a hardware-free mock mode for motor_manager. In this mode,
+            motor setpoints are echoed as telemetry feedback values without
+            creating real motor_controller instances.
+
+    config MOTOR_MANAGER_DEFAULT_UPDATE_TASK_STACK
+        int "Default motor manager update task stack size"
+        default 4096
+        range 2048 16384
+        help
+            Stack size in bytes for the optional internal update task that
+            periodically calls MotorManager::updateAll().
+
+    config MOTOR_MANAGER_DEFAULT_UPDATE_TASK_PRIO
+        int "Default motor manager update task priority"
+        default 6
+        range 1 24
+        help
+            FreeRTOS priority for the optional internal update task.
+
+    config MOTOR_MANAGER_DEFAULT_CONFIG_TASK_STACK
+        int "Default motor manager config task stack size"
+        default 4096
+        range 2048 16384
+        help
+            Stack size in bytes for the internal configuration command task.
+            This task parses and dispatches queued configure commands.
+
+    config MOTOR_MANAGER_DEFAULT_CONFIG_TASK_PRIO
+        int "Default motor manager config task priority"
+        default 6
+        range 1 24
+        help
+            FreeRTOS priority for the internal configuration command task.
+
+endmenu
