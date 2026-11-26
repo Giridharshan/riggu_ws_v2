@@ -87,30 +87,26 @@ We moved the IMU off the ESP32 onto the **Raspberry Pi 5 hardware I2C bus (`/dev
 * **Cause:** Overwriting `/boot/firmware/bcm2712-rpi-5-b.dtb` with a Raspberry Pi OS DTB breaks the Ubuntu 24.04 (`6.8.0-raspi`) PCIe link to the Pi 5 **RP1 southbridge**, disabling all USB ports and I2C controllers. Additionally, on Ubuntu Pi 5, `dtparam=i2c_arm=on` must be placed under `[all]` in `/boot/firmware/config.txt` (not `[pi4]`) with `i2c-dev` in `/etc/modules`.
 * **Fix:** Restore Ubuntu's kernel-matched `/usr/lib/firmware/6.8.0-1068-raspi/device-tree/broadcom/bcm2712-rpi-5-b.dtb` to `/boot/firmware/bcm2712-rpi-5-b.dtb`, enable I2C under `[all]`, and reboot.
 
-### 9. Headless Pi `rviz2` Crash (`qt.qpa.xcb`)
-* **Symptom:** Launching `rviz2` over SSH fails with `Could not load the Qt platform plugin "xcb"`.
-* **Fix:** Run `rviz2` remotely on the Ubuntu workstation/laptop with `ros-jazzy-nav2-rviz-plugins` installed.
-
 ---
 
 ## Phase 4: Nav2 Jazzy Bringup & Autonomous Navigation
 
-### 10. `Frame [map] does not exist` & AMCL Transform Wait
+### 9. `Frame [map] does not exist` & AMCL Transform Wait
 * **Symptom:** RViz shows `Frame [map] does not exist`, and AMCL logs `AMCL cannot publish a pose or update the transform. Please set the initial pose...`.
 * **Cause:** AMCL withholds `map -> odom` until an initial pose is published on `/initialpose`, and plain `rviz2` has no `Map` display configured.
 * **Fix:** Launch RViz2 with `nav2_default_view.rviz` (or add `Map` `/map`, `LaserScan` `/scan`, `TF`, `Path` `/plan`) and set Riggu's starting pose with **`2D Pose Estimate`**.
 
-### 11. Nav2 Lifecycle Aborts on `collision_monitor` and `docking_server`
+### 10. Nav2 Lifecycle Aborts on `collision_monitor` and `docking_server`
 * **Symptoms:** `parameter 'observation_sources' is not initialized` (`collision_monitor`) and `Charging dock plugins not given!` (`opennav_docking`).
 * **Cause:** `nav2_bringup` in Jazzy brings up both servers by default and aborts if their parameters are missing from `nav2_params.yaml`.
 * **Fix:** Add explicit `collision_monitor` and minimal `docking_server` blocks to `nav2_params.yaml`.
 
-### 12. 4000 ms Bond Timeout & `Magick: abort due to signal 11 (SIGSEGV)`
+### 11. 4000 ms Bond Timeout & `Magick: abort due to signal 11 (SIGSEGV)`
 * **Symptom:** `CRITICAL FAILURE: SERVER amcl IS DOWN after not receiving a heartbeat for 4000 ms` followed by `Magick: abort due to signal 11 (SIGSEGV)` and `[component_container_isolated-2]: process has died [exit code -6]`.
 * **Cause:** Default `use_composition: True` runs all Nav2 nodes inside one shared container (`component_container_isolated`). Pi 5 startup CPU spikes exceed the 4.0 s bond timeout, triggering a teardown during which `map_server`'s GraphicsMagick unload segfaults and kills the whole stack.
 * **Fix:** Set `'use_composition': 'False'` in `navigation.launch.py` and `bond_timeout: 0.0` in `lifecycle_manager_localization` and `lifecycle_manager_navigation`.
 
-### 13. Path Planned, But Robot Does Not Move (`Velocity command timed out. Braking.` + `Failed to make progress`)
+### 12. Path Planned, But Robot Does Not Move (`Velocity command timed out. Braking.` + `Failed to make progress`)
 * **Symptom:** `controller_server` logs `Passing new path to controller`, then aborts (`Failed to make progress`, `spin failed`, `backup failed`), while `velocity_controller` repeats `Velocity command timed out. Braking.`.
 * **Root Causes (diagnosed with `ros2 topic info -v`):**
   1. **Message type mismatch:** `diff_drive_controller` in Jazzy expects **`TwistStamped`**, whereas Nav2 defaults to unstamped **`Twist`** (`['geometry_msgs/msg/Twist', 'geometry_msgs/msg/TwistStamped']`).
@@ -119,6 +115,6 @@ We moved the IMU off the ESP32 onto the **Raspberry Pi 5 hardware I2C bus (`/dev
   1. Set `enable_stamped_cmd_vel: true` across `bt_navigator`, `controller_server`, `behavior_server`, `velocity_smoother`, `collision_monitor`, and `docking_server`.
   2. Set `cmd_vel_in_topic: "cmd_vel_smoothed"` and `cmd_vel_out_topic: "/velocity_controller/cmd_vel"` under `collision_monitor`.
 
-### 14. Planner Action Timeout Under Pi Load & Obstacle Grazing
+### 13. Planner Action Timeout Under Pi Load & Obstacle Grazing
 * **Symptoms:** `Timed out while waiting for action server to acknowledge goal request for compute_path_to_pose`, `Planner loop missed its desired rate of 5.0000 Hz (1.54 Hz actual)`, and `Collision Ahead - Exiting DriveOnHeading` / path cutting too close to walls.
 * **Fix:** Adjust costmap inflation (`robot_radius: 0.26–0.28`, `inflation_radius: 0.34–0.50`, `cost_scaling_factor: 2.0–4.0`) and `BaseObstacle.scale` to bias paths toward open hallway centers while keeping `10 Hz` control loops within Pi 5 CPU capacity.
